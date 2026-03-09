@@ -1,14 +1,25 @@
-# Доска объявлений (Задание 2)
+# Доска объявлений - Задание 2
 
 ## Тема
-Доска объявлений с публикацией объявлений, сообщениями и жалобами.
+Доска объявлений с возможностью размещать объявления по категориям, обмениваться сообщениями и оставлять жалобы.
 
-## Сущности
-- Category (категории)
-- User (пользователи) 
-- Listing (объявления)
-- Message (сообщения)
-- Report (жалобы)
+## Основные сущности
+- **Category** - категории объявлений (id, name, description)
+- **User** - пользователи (id, name, email)  
+- **Listing** - объявления (id, title, description, price, authorId, categoryId, status)
+- **Message** - сообщения (id, text, senderId, recipientId, listingId)
+- **Report** - жалобы (id, reason, reporterId, targetListingId)
 
-## API endpoints
-Полный CRUD для всех сущностей:
+## REST API (полный CRUD)
+POST/GET/PUT/DELETE /api/categories
+POST/GET/PUT/DELETE /api/users
+POST/GET/PUT/DELETE /api/listings
+POST/GET/PUT/DELETE /api/messages
+POST/GET/PUT/DELETE /api/reports
+
+text
+
+## Тестовые данные
+- Category id=1: "Автомобили"  
+- User id=1: "Иван Иванов"  
+- Listing id=1: "Продаю Toyota Camry"
