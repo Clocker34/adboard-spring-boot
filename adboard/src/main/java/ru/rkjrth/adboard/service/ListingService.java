@@ -1,38 +1,47 @@
 package ru.rkjrth.adboard.service;
 
-import ru.rkjrth.adboard.dto.ListingDto;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import ru.rkjrth.adboard.entity.Category;
+import ru.rkjrth.adboard.entity.Listing;
+import ru.rkjrth.adboard.entity.User;
+import ru.rkjrth.adboard.repository.CategoryRepository;
+import ru.rkjrth.adboard.repository.ListingRepository;
+import ru.rkjrth.adboard.repository.UserRepository;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
+import java.math.BigDecimal;
 
 @Service
 public class ListingService {
-    private final Map<Long, ListingDto> listings = new ConcurrentHashMap<>();
-    private final AtomicLong idGenerator = new AtomicLong(1);
 
-    public List<ListingDto> getAll() { return new ArrayList<>(listings.values()); }
+    private final ListingRepository listingRepository;
+    private final UserRepository userRepository;
+    private final CategoryRepository categoryRepository;
 
-    public ListingDto getById(Long id) { return listings.get(id); }
-
-    public ListingDto create(ListingDto listing) {
-        Long id = idGenerator.getAndIncrement();
-        ListingDto newListing = new ListingDto(id, listing.title(), listing.description(),
-                listing.price(), listing.authorId(), listing.categoryId(), listing.status());
-        listings.put(id, newListing);
-        return newListing;
+    public ListingService(ListingRepository listingRepository,
+                          UserRepository userRepository,
+                          CategoryRepository categoryRepository) {
+        this.listingRepository = listingRepository;
+        this.userRepository = userRepository;
+        this.categoryRepository = categoryRepository;
     }
 
-    public ListingDto update(Long id, ListingDto listing) {
-        if (!listings.containsKey(id)) return null;
-        ListingDto updated = new ListingDto(id, listing.title(), listing.description(),
-                listing.price(), listing.authorId(), listing.categoryId(), listing.status());
-        listings.put(id, updated);
-        return updated;
-    }
+    /**
+     * Бизнес-операция 1:
+     * Создать объявление для пользователя в заданной категории.
+     */
+    @Transactional
+    public Listing createListingForUserInCategory(Long userId,
+                                                  Long categoryId,
+                                                  String title,
+                                                  String description,
+                                                  BigDecimal price) {
+        User owner = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
+        Category category = categoryRepository.findById(categoryId)
+                .orElseThrow(() -> new IllegalArgumentException("Category not found: " + categoryId));
 
-    public boolean delete(Long id) { return listings.remove(id) != null; }
+        Listing listing = new Listing(title, description, price, owner, category);
+        return listingRepository.save(listing);
+    }
 }

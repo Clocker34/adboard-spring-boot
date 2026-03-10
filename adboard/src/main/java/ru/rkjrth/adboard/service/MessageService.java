@@ -1,38 +1,49 @@
 package ru.rkjrth.adboard.service;
 
-import ru.rkjrth.adboard.dto.MessageDto;
 import org.springframework.stereotype.Service;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
+import org.springframework.transaction.annotation.Transactional;
+import ru.rkjrth.adboard.entity.Listing;
+import ru.rkjrth.adboard.entity.Message;
+import ru.rkjrth.adboard.entity.User;
+import ru.rkjrth.adboard.repository.ListingRepository;
+import ru.rkjrth.adboard.repository.MessageRepository;
+import ru.rkjrth.adboard.repository.UserRepository;
 
 @Service
 public class MessageService {
-    private final Map<Long, MessageDto> messages = new ConcurrentHashMap<>();
-    private final AtomicLong idGenerator = new AtomicLong(1);
 
-    public List<MessageDto> getAll() { return new ArrayList<>(messages.values()); }
+    private final MessageRepository messageRepository;
+    private final UserRepository userRepository;
+    private final ListingRepository listingRepository;
 
-    public MessageDto getById(Long id) { return messages.get(id); }
-
-    public MessageDto create(MessageDto message) {
-        Long id = idGenerator.getAndIncrement();
-        MessageDto newMessage = new MessageDto(id, message.text(), message.senderId(),
-                message.recipientId(), message.listingId());
-        messages.put(id, newMessage);
-        return newMessage;
+    public MessageService(MessageRepository messageRepository,
+                          UserRepository userRepository,
+                          ListingRepository listingRepository) {
+        this.messageRepository = messageRepository;
+        this.userRepository = userRepository;
+        this.listingRepository = listingRepository;
     }
 
-    public MessageDto update(Long id, MessageDto message) {
-        if (!messages.containsKey(id)) return null;
-        MessageDto updated = new MessageDto(id, message.text(), message.senderId(),
-                message.recipientId(), message.listingId());
-        messages.put(id, updated);
-        return updated;
-    }
+    /**
+     * Бизнес-операция 2:
+     * Отправить сообщение по объявлению от sender к владельцу объявления.
+     */
+    @Transactional
+    public Message sendMessageToListingOwner(Long listingId,
+                                             Long senderId,
+                                             String content) {
+        Listing listing = listingRepository.findById(listingId)
+                .orElseThrow(() -> new IllegalArgumentException("Listing not found: " + listingId));
 
-    public boolean delete(Long id) { return messages.remove(id) != null; }
+        User sender = userRepository.findById(senderId)
+                .orElseThrow(() -> new IllegalArgumentException("Sender not found: " + senderId));
+
+        User recipient = listing.getOwner();
+        if (recipient.getId().equals(sender.getId())) {
+            throw new IllegalArgumentException("Owner cannot send message to himself for this listing");
+        }
+
+        Message message = new Message(content, sender, recipient, listing);
+        return messageRepository.save(message);
+    }
 }

@@ -1,11 +1,9 @@
 package ru.rkjrth.adboard.controller;
 
-import ru.rkjrth.adboard.dto.MessageDto;
-import ru.rkjrth.adboard.service.MessageService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
+import ru.rkjrth.adboard.entity.Message;
+import ru.rkjrth.adboard.service.MessageService;
 
 @RestController
 @RequestMapping("/api/messages")
@@ -17,27 +15,24 @@ public class MessageController {
         this.messageService = messageService;
     }
 
-    @GetMapping
-    public List<MessageDto> getAll() { return messageService.getAll(); }
+    public static class SendMessageRequest {
+        private String content;
 
-    @GetMapping("/{id}")
-    public ResponseEntity<MessageDto> getById(@PathVariable Long id) {
-        MessageDto message = messageService.getById(id);
-        return message != null ? ResponseEntity.ok(message) : ResponseEntity.notFound().build();
+        public String getContent() {
+            return content;
+        }
+
+        public void setContent(String content) {
+            this.content = content;
+        }
     }
 
-    @PostMapping
-    public MessageDto create(@RequestBody MessageDto message) { return messageService.create(message); }
-
-    @PutMapping("/{id}")
-    public ResponseEntity<MessageDto> update(@PathVariable Long id, @RequestBody MessageDto message) {
-        MessageDto updated = messageService.update(id, message);
-        return updated != null ? ResponseEntity.ok(updated) : ResponseEntity.notFound().build();
-    }
-
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        boolean deleted = messageService.delete(id);
-        return deleted ? ResponseEntity.ok().build() : ResponseEntity.notFound().build();
+    // Бизнес-операция 2: отправить сообщение владельцу объявления
+    @PostMapping("/listing/{listingId}/from/{senderId}")
+    public ResponseEntity<Message> sendMessage(@PathVariable Long listingId,
+                                               @PathVariable Long senderId,
+                                               @RequestBody SendMessageRequest body) {
+        Message message = messageService.sendMessageToListingOwner(listingId, senderId, body.getContent());
+        return ResponseEntity.ok(message);
     }
 }
