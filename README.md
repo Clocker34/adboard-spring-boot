@@ -1,21 +1,59 @@
-# Доска объявлений - Задание 2
+# Adboard – сервис объявлений
 
-## Тема
-Доска объявлений с возможностью размещать объявления по категориям, обмениваться сообщениями и оставлять жалобы.
+## Тема проекта
+Онлайн-доска объявлений, где пользователи публикуют объявления в разных категориях, могут отправлять сообщения владельцам и оставлять жалобы на нарушение правил.
 
 ## Основные сущности
-- **Category** - категории объявлений (id, name, description)
-- **User** - пользователи (id, name, email)  
-- **Listing** - объявления (id, title, description, price, authorId, categoryId, status)
-- **Message** - сообщения (id, text, senderId, recipientId, listingId)
-- **Report** - жалобы (id, reason, reporterId, targetListingId)
+- User – пользователь сервиса (username, email, дата регистрации).
+- Category – категория объявлений (название, описание).
+- Listing – объявление (заголовок, описание, цена, владелец, категория, статус).
+- Message – сообщение, отправленное владельцу объявления.
+- Report – жалоба на объявление (причина, статус, автор, связанное объявление).
 
-## REST API (полный CRUD)
-POST/GET/PUT/DELETE /api/categories
-POST/GET/PUT/DELETE /api/users
-POST/GET/PUT/DELETE /api/listings
-POST/GET/PUT/DELETE /api/messages
-POST/GET/PUT/DELETE /api/reports
+## Операции сервиса
+
+### CRUD
+- Пользователи:
+  - `GET /api/users`
+  - `GET /api/users/{id}`
+  - `POST /api/users`
+  - `PUT /api/users/{id}`
+  - `DELETE /api/users/{id}`
+
+- Категории:
+  - `GET /api/categories`
+  - `GET /api/categories/{id}`
+  - `POST /api/categories`
+  - `PUT /api/categories/{id}`
+  - `DELETE /api/categories/{id}`
+
+- Объявления:
+  - `GET /api/listings`
+  - `GET /api/listings/{id}`
+  - `POST /api/listings`
+  - `PUT /api/listings/{id}`
+  - `DELETE /api/listings/{id}`
+
+### Бизнес-операции (задание 3)
+1. Создать объявление от пользователя в категории  
+   `POST /api/listings/user/{userId}/category/{categoryId}`
+
+2. Отправить сообщение владельцу объявления  
+   `POST /api/messages/listing/{listingId}/from/{senderId}`
+
+3. Оставить жалобу на объявление  
+   `POST /api/reports/listing/{listingId}/from/{reporterId}`
+
+4. Взять жалобу в работу (скрыть объявление)  
+   `POST /api/reports/{reportId}/start-review`
+
+5. Завершить рассмотрение жалобы (подтвердить / отклонить)  
+   `POST /api/reports/{reportId}/complete-review`
+
+### Поиск объявлений
+- Фильтрация объявлений по категории, владельцу, статусу и диапазону цен:  
+  `GET /api/listings/search?categoryId=&ownerId=&status=&minPrice=&maxPrice=`
+
 
 text
 
