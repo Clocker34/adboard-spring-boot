@@ -1,6 +1,6 @@
 # Adboard — учебный проект (Spring Boot)
 
-Кратко о репозитории по этапам **заданий 1–3**: подготовка проекта, REST API, база данных и бизнес-логика.
+Кратко о репозитории по этапам **заданий 1–5**: подготовка проекта, REST API, база данных, базовая безопасность, **JWT (access/refresh) и сессии в БД**.
 
 ---
 
@@ -18,10 +18,12 @@
 
 ```text
 cd adboard
-mvnw.cmd spring-boot:run
+.\mvnw.cmd spring-boot:run
 ```
 
-На Linux/macOS: `./mvnw spring-boot:run`. Порт по умолчанию: **8081**; если он занят уже запущенным экземпляром — в `.env` или в среде задайте **`SERVER_PORT=8082`** (см. `application.properties`).
+На Linux/macOS: `./mvnw spring-boot:run`. **Обёртка Maven лежит в каталоге `adboard` внутри репозитория** (не в корне репозитория).
+
+Порт по умолчанию: **8082** (`server.port` в `adboard/src/main/resources/application.properties`). Другой порт: переменная окружения **`SERVER_PORT`** (например `8081`).
 
 **PostgreSQL в Docker на `localhost:5432`** (как контейнер `postgres` в Docker Desktop): скопируйте `.env.example` в `.env`, укажите **`SPRING_DATASOURCE_PASSWORD`**, оставьте **`ADBOARD_SKIP_DOCKER_COMPOSE=1`**, затем из корня репозитория: `.\scripts\run-dev.ps1` — второй контейнер Postgres из `docker-compose.yml` не поднимается.
 
@@ -58,7 +60,7 @@ mvnw.cmd spring-boot:run
 ### Postman
 
 Коллекция с парами запросов (CRUD и сценарии): файл **`adboard/adboard-postman-collection.json`**.  
-Импорт: Postman → **Import** → выбрать JSON. Переменная **`baseUrl`**: `http://localhost:8081`; при необходимости задайте id сущностей (`userId`, `categoryId`, и т.д.).
+Импорт: Postman → **Import** → выбрать JSON. Переменная **`baseUrl`**: `http://localhost:8082` (или ваш `SERVER_PORT`); при необходимости задайте id сущностей (`userId`, `categoryId`, и т.д.).
 
 ---
 
@@ -138,31 +140,83 @@ mvnw.cmd spring-boot:run
 
 ## Задание 4. Базовая безопасность API
 
-### Spring Security
+**Актуальная конфигурация:** на этапе **задания 5** вместо HTTP Basic и cookie-CSRF для REST используется **JWT** (stateless API). Ниже — что остаётся общим с этапом 4; детали входа и защиты запросов — в [задании 5](#assignment-5).
 
-- Подключён **`spring-boot-starter-security`**: **HTTP Basic Auth** и **CSRF** (`CookieCsrfTokenRepository`, заголовок `X-XSRF-TOKEN`, cookie `XSRF-TOKEN`).
-- Публично без авторизации: `GET /`, `/hello`, `/info`, **`GET /api/csrf`**, **`POST /api/auth/register`**.
-- Остальные **`/api/**`** — только для аутентифицированных пользователей.
-- **`/api/users/**`** и **`/api/reports/**`** — только роль **ADMIN**.
+### Spring Security (текущее поведение)
+
+- Подключён **`spring-boot-starter-security`**: **сессии stateless**, **CSRF отключён** (типично для JWT API).
+- Аутентификация по **заголовку** `Authorization: Bearer <access JWT>` (фильтр `JwtAuthenticationFilter`).
+- Публично без токена: `GET /`, `/hello`, `/info`, **`GET /api/csrf`**, **`POST /api/auth/register`**, **`POST /auth/login`**, **`POST /auth/refresh`**.
+- Остальные **`/api/**`** (кроме перечисленного) — с валидным **access**-токеном.
+- **`/api/users/**`** и **`/api/reports/**`** — роль **ADMIN**.
 
 ### Пользователи и пароли
 
-- Учётные записи хранятся в **PostgreSQL** (сущность `User`: `username`, `passwordHash` BCrypt, роль `USER` / `ADMIN`).
-- Загрузка для Basic Auth: класс **`DatabaseUserDetailsService`** (`UserDetailsService`).
+- Учётные записи в **PostgreSQL** (сущность `User`: `username`, `passwordHash` BCrypt, роль `USER` / `ADMIN`).
+- **`DatabaseUserDetailsService`** используется для интеграции с Spring Security (в т.ч. при проверке учётных данных при логине).
 - **Регистрация:** `POST /api/auth/register` с телом JSON: `username`, `email`, `password`, `name`. Пароль: не короче 8 символов, хотя бы одна цифра и спецсимвол из `!@#$%^&*`.
-- **Первый администратор** создаётся только из переменных окружения (не из кода и не из SQL в репозитории): `ADBOARD_BOOTSTRAP_ADMIN_USERNAME`, `ADBOARD_BOOTSTRAP_ADMIN_PASSWORD`.
-- Создание/изменение пользователей администратором: `POST/PUT /api/users` с телом **`AdminUserRequest`** (поля `username`, `name`, `email`, `password`, `role`).
-
-### Перед запросами с изменением данных
-
-1. Выполнить **`GET /api/csrf`** (в том же клиенте сохранятся cookie сессии и `XSRF-TOKEN`).
-2. Для `POST`/`PUT`/`DELETE` передать заголовок **`X-XSRF-TOKEN`** со значением из cookie `XSRF-TOKEN`.
-3. Для защищённых эндпоинтов — **Basic Auth** (логин = `username` в БД, пароль — как при регистрации или bootstrap).
+- **Первый администратор:** переменные `ADBOARD_BOOTSTRAP_ADMIN_USERNAME`, `ADBOARD_BOOTSTRAP_ADMIN_PASSWORD`.
+- Администрирование пользователей: `POST/PUT /api/users` с телом **`AdminUserRequest`**.
 
 ### Тесты
 
-Профиль **`test`** использует встроенную **H2** (`src/test/resources/application-test.properties`), чтобы не требовать PostgreSQL при `mvn test`.
+Профиль **`test`** использует **H2** (`adboard/src/test/resources/application-test.properties`). Для корректной работы **`Instant`** с H2 в тестах задан явный **`Hibernate H2Dialect`** (иначе возможны ошибки при проверке срока refresh-сессии).
+
+Запуск тестов из каталога **`adboard`** (где лежит `mvnw.cmd`):
+
+```text
+cd adboard
+.\mvnw.cmd test
+```
 
 ---
 
-*Java 17, Spring Boot 3.5.5, порт по умолчанию 8081.*
+<a id="assignment-5"></a>
+
+## Задание 5. JWT Access/Refresh и управление сессиями
+
+### Идея
+
+- **Access JWT** — короткоживущий, передаётся в **`Authorization: Bearer`**, содержит claims (`typ=access`, роль, `uid` и т.д.).
+- **Refresh JWT** — долгоживущий, хранит **`jti`**, сопоставляется с записью в таблице **`user_sessions`**; при обмене на новую пару токенов старая сессия помечается **`REPLACED`** (повторное использование старого refresh отклоняется).
+
+### Модель данных
+
+| Элемент | Описание |
+|--------|----------|
+| Таблица **`user_sessions`** | Сущность `UserSession`: связь с пользователем, **`refresh_jti`**, **`status`** (`ACTIVE` / `REPLACED` / `REVOKED`), срок **`expires_at`**. |
+| Репозиторий | `UserSessionRepository` (поиск сессии по `refresh_jti`). |
+
+### Конфигурация (`application.properties`)
+
+| Переменная / свойство | Назначение |
+|----------------------|------------|
+| **`JWT_SECRET`** (или `jwt.secret`) | Секрет HMAC; **не короче 32 символов** для HS256/совместимых алгоритмов в текущей реализации. |
+| **`JWT_ACCESS_MS`** / `jwt.access-expiration-ms` | TTL access-токена (мс). |
+| **`JWT_REFRESH_MS`** / `jwt.refresh-expiration-ms` | TTL refresh-токена (мс). |
+
+### API
+
+| Метод | Путь | Тело | Ответ |
+|-------|------|------|--------|
+| `POST` | **`/auth/login`** | JSON: `username`, `password` | `accessToken`, `refreshToken`, `tokenType` |
+| `POST` | **`/auth/refresh`** | JSON: `refreshToken` | новая пара `accessToken` / `refreshToken` |
+
+Защищённые запросы: заголовок `Authorization: Bearer` и строка access-токена.
+
+### Как проверить вручную (сценарий курса)
+
+1. **`POST /auth/login`** — сохранить `accessToken` и `refreshToken`.
+2. Запрос к защищённому API, например **`GET /api/categories`**, с заголовком **`Authorization: Bearer`** и access-токеном из шага 1 — ожидается успех (**200**).
+3. **`POST /auth/refresh`** с текущим `refreshToken` — ожидается **200** и **новая** пара токенов.
+4. Повторить **`POST /auth/refresh`** со **старым** refresh из шага 1 — ожидается **401**, новая пара не выдаётся.
+5. В PostgreSQL: **`SELECT * FROM user_sessions`** — у старой сессии статус **`REPLACED`**, у новой — **`ACTIVE`**.
+
+### Автотесты
+
+- `JwtTokenProviderTest` — корректность claims refresh-токена (`jti`).
+- `AuthTokenIntegrationTest` — полный сценарий login → доступ по access → refresh → отказ при reuse старого refresh → проверка статусов в БД.
+
+---
+
+*Java 17, Spring Boot 3.5.5, порт по умолчанию **8082**.*
