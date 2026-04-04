@@ -52,14 +52,14 @@ public class ListingController {
         return deleted ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
     }
 
-    @PostMapping("/{id}/publish")
+    @PostMapping("/{id}/publish") //Публикция объявления
     public ResponseEntity<Listing> publish(@PathVariable Long id) {
         return listingService.publish(id)
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    @PostMapping("/{id}/close")
+    @PostMapping("/{id}/close") //Закрытие объявления
     public ResponseEntity<Listing> close(@PathVariable Long id) {
         return listingService.close(id)
                 .map(ResponseEntity::ok)

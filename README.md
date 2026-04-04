@@ -21,7 +21,9 @@ cd adboard
 mvnw.cmd spring-boot:run
 ```
 
-На Linux/macOS: `./mvnw spring-boot:run`. Порт по умолчанию: **8081** (`application.properties`).
+На Linux/macOS: `./mvnw spring-boot:run`. Порт по умолчанию: **8081**; если он занят уже запущенным экземпляром — в `.env` или в среде задайте **`SERVER_PORT=8082`** (см. `application.properties`).
+
+**PostgreSQL в Docker на `localhost:5432`** (как контейнер `postgres` в Docker Desktop): скопируйте `.env.example` в `.env`, укажите **`SPRING_DATASOURCE_PASSWORD`**, оставьте **`ADBOARD_SKIP_DOCKER_COMPOSE=1`**, затем из корня репозитория: `.\scripts\run-dev.ps1` — второй контейнер Postgres из `docker-compose.yml` не поднимается.
 
 ---
 
@@ -131,6 +133,35 @@ mvnw.cmd spring-boot:run
 | **Тема** | Онлайн-доска объявлений |
 | **Сущности** | User, Category, Listing, Message, Report |
 | **Операции** | Полный REST CRUD по пяти сущностям; публикация и закрытие объявления; переписка и просмотр диалога по объявлению; модерация жалоб, в том числе атомарное закрытие жалобы и связанного объявления |
+
+---
+
+## Задание 4. Базовая безопасность API
+
+### Spring Security
+
+- Подключён **`spring-boot-starter-security`**: **HTTP Basic Auth** и **CSRF** (`CookieCsrfTokenRepository`, заголовок `X-XSRF-TOKEN`, cookie `XSRF-TOKEN`).
+- Публично без авторизации: `GET /`, `/hello`, `/info`, **`GET /api/csrf`**, **`POST /api/auth/register`**.
+- Остальные **`/api/**`** — только для аутентифицированных пользователей.
+- **`/api/users/**`** и **`/api/reports/**`** — только роль **ADMIN**.
+
+### Пользователи и пароли
+
+- Учётные записи хранятся в **PostgreSQL** (сущность `User`: `username`, `passwordHash` BCrypt, роль `USER` / `ADMIN`).
+- Загрузка для Basic Auth: класс **`DatabaseUserDetailsService`** (`UserDetailsService`).
+- **Регистрация:** `POST /api/auth/register` с телом JSON: `username`, `email`, `password`, `name`. Пароль: не короче 8 символов, хотя бы одна цифра и спецсимвол из `!@#$%^&*`.
+- **Первый администратор** создаётся только из переменных окружения (не из кода и не из SQL в репозитории): `ADBOARD_BOOTSTRAP_ADMIN_USERNAME`, `ADBOARD_BOOTSTRAP_ADMIN_PASSWORD`.
+- Создание/изменение пользователей администратором: `POST/PUT /api/users` с телом **`AdminUserRequest`** (поля `username`, `name`, `email`, `password`, `role`).
+
+### Перед запросами с изменением данных
+
+1. Выполнить **`GET /api/csrf`** (в том же клиенте сохранятся cookie сессии и `XSRF-TOKEN`).
+2. Для `POST`/`PUT`/`DELETE` передать заголовок **`X-XSRF-TOKEN`** со значением из cookie `XSRF-TOKEN`.
+3. Для защищённых эндпоинтов — **Basic Auth** (логин = `username` в БД, пароль — как при регистрации или bootstrap).
+
+### Тесты
+
+Профиль **`test`** использует встроенную **H2** (`src/test/resources/application-test.properties`), чтобы не требовать PostgreSQL при `mvn test`.
 
 ---
 

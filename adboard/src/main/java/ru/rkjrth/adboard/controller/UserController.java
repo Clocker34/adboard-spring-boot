@@ -1,6 +1,7 @@
 package ru.rkjrth.adboard.controller;
 
 import jakarta.validation.Valid;
+import ru.rkjrth.adboard.dto.AdminUserRequest;
 import ru.rkjrth.adboard.entity.User;
 import ru.rkjrth.adboard.service.UserService;
 import org.springframework.http.ResponseEntity;
@@ -31,15 +32,23 @@ public class UserController {
     }
 
     @PostMapping
-    public ResponseEntity<User> create(@Valid @RequestBody User user) {
-        return ResponseEntity.ok(userService.create(user));
+    public ResponseEntity<?> create(@Valid @RequestBody AdminUserRequest request) {
+        try {
+            return ResponseEntity.ok(userService.createByAdmin(request));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<User> update(@PathVariable Long id, @Valid @RequestBody User user) {
-        return userService.update(id, user)
-                .map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+    public ResponseEntity<?> update(@PathVariable Long id, @RequestBody AdminUserRequest request) {
+        try {
+            return userService.updateByAdmin(id, request)
+                    .map(ResponseEntity::ok)
+                    .orElseGet(() -> ResponseEntity.notFound().build());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
     }
 
     @DeleteMapping("/{id}")
