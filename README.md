@@ -1,101 +1,137 @@
-# Задание 3. Adboard — база данных и бизнес-операции
+# Adboard — учебный проект (Spring Boot)
 
-## Тема проекта
+Кратко о репозитории по этапам **заданий 1–3**: подготовка проекта, REST API, база данных и бизнес-логика.
 
-**Онлайн-доска объявлений:** пользователи публикуют объявления в категориях, обмениваются сообщениями по объявлению, пользователи могут подавать жалобы на объявления. Данные хранятся в **PostgreSQL**, доступ — через **Spring Data JPA** (не в памяти).
+---
 
-## Основные сущности
+## Задание 1. Подготовка репозитория
 
-| Сущность | Назначение | Связи и ограничения |
-|----------|------------|---------------------|
-| **User** | Пользователь | Уникальный **email**. One-to-many к объявлениям (владелец), сообщениям (отправитель/получатель), жалобам (автор). |
-| **Category** | Категория объявлений | Уникальное **name**. One-to-many к объявлениям. |
-| **Listing** | Объявление | Many-to-one к **User** (owner), **Category**; статусы `DRAFT` / `PUBLISHED` / `CLOSED`, даты создания/обновления/закрытия. |
-| **Message** | Сообщение в контексте объявления | Many-to-one к **User** (sender, receiver) и **Listing**. |
-| **Report** | Жалоба на объявление | Many-to-one к **User** (author) и **Listing**; статусы `NEW` / `IN_REVIEW` / `RESOLVED` / `REJECTED`. |
+### Что сделано
 
-Схема таблиц создаётся Hibernate (`spring.jpa.hibernate.ddl-auto=update`) на основе сущностей в `adboard/src/main/java/ru/rkjrth/adboard/entity/`.
+- **Java-проект на Spring Boot** версии **3.5.5** (см. `adboard/pom.xml`, родитель `spring-boot-starter-parent`).
+- **Код опубликован на GitHub** — клонируйте репозиторий и открывайте каталог `adboard` как Maven-модуль.
+- **Простые контроллеры** для проверки работы Spring MVC:
+  - `GET /hello` — текстовый ответ (`HelloController`);
+  - `GET /info` — JSON с названием сервиса и версией (`InfoController`).
 
-## База данных и конфигурация
-
-- **СУБД:** PostgreSQL.
-- Параметры подключения задаются в `adboard/src/main/resources/application.properties` (URL, пользователь, пароль).
-
-Чувствительные значения для продакшена или сдачи лучше не фиксировать в репозитории: переопределите через **переменные окружения** (Spring Boot подхватывает их автоматически):
-
-- `SPRING_DATASOURCE_URL` — например `jdbc:postgresql://localhost:5432/adboard`
-- `SPRING_DATASOURCE_USERNAME`
-- `SPRING_DATASOURCE_PASSWORD`
-
-**БД в Docker (пример):** контейнер с Postgres должен слушать тот же хост/порт, что и в JDBC URL. Просмотр таблиц:
-
-```bash
-docker exec -it <имя_контейнера> psql -U <postgres_user> -d adboard -c "\dt"
-```
-
-## CRUD по сущностям
-
-Контроллеры читают и пишут в БД через сервисы и репозитории.
-
-| Ресурс | Базовый путь | Примечание |
-|--------|--------------|------------|
-| Пользователи | `GET/POST/PUT/DELETE /api/users` | Тело: `name`, `email` |
-| Категории | `GET/POST/PUT/DELETE /api/categories` | Тело: `name`, `description` |
-| Объявления | `GET/POST/PUT/DELETE /api/listings` | Создание: query `ownerId`, `categoryId` + тело объявления |
-| Сообщения | `GET/POST/PUT/DELETE /api/messages` | Создание: query `senderId`, `receiverId`, `listingId` + тело `text` |
-| Жалобы | `GET/POST/PUT/DELETE /api/reports` | Создание: query `authorId`, `listingId` + тело причины/статуса |
-
-Служебные эндпоинты: `GET /`, `/hello`, `/info`.
-
-## Бизнес-операции (не CRUD)
-
-Реализовано **6** операций с предметной логикой (требование — не меньше 5). Места в коде: `ListingController` + `ListingService`, `MessageController` + `MessageService`, `ReportController` + `ReportService`.
-
-| # | Операция | HTTP | Кратко |
-|---|----------|------|--------|
-| 1 | Публикация объявления | `POST /api/listings/{id}/publish` | Статус объявления → `PUBLISHED`. |
-| 2 | Закрытие объявления | `POST /api/listings/{id}/close` | Статус → `CLOSED`, заполняется `closedAt`. |
-| 3 | Сообщение по объявлению | `POST /api/messages?...` | Создание сообщения с привязкой к отправителю, получателю и объявлению. |
-| 4 | Переписка по объявлению | `GET /api/messages/listing/{listingId}` | Список сообщений по данному объявлению (несколько сущностей в выборке). |
-| 5 | Жалоба в рассмотрение | `POST /api/reports/{id}/in-review` | Статус жалобы → `IN_REVIEW`. |
-| 6 | Решение жалобы и закрытие лота | `POST /api/reports/{id}/resolve-and-close-listing` | Жалоба → `RESOLVED`, связанное объявление закрывается; **одна транзакция** на две сущности. |
-
-Реализация в коде: `ListingService`, `MessageService`, `ReportService` и соответствующие REST-контроллеры в `adboard/src/main/java/ru/rkjrth/adboard/`.
-
-## Коллекция запросов (Postman)
-
-Файл: **`adboard/adboard-postman-collection.json`**
-
-- Переменная `baseUrl` (по умолчанию `http://localhost:8081`).
-- Переменные для id: `userId`, `userId2`, `categoryId`, `listingId`, `reportId`, `messageId` — заполняйте после создания сущностей.
-
-Импорт: Postman → Import → выбрать этот JSON.
-
-## Запуск приложения
+### Запуск (после клонирования)
 
 ```text
 cd adboard
 mvnw.cmd spring-boot:run
 ```
 
-(На Linux/macOS: `./mvnw spring-boot:run`.)
-
-Порт: **8081** (см. `application.properties`).
-
-Перед запуском убедитесь, что PostgreSQL доступен по URL из конфигурации и база данных создана (например, `CREATE DATABASE adboard;`).
-
-## Сценарий проверки (создать данные → операция → результат)
-
-1. `POST /api/users` — создать двух пользователей (для переписки).
-2. `POST /api/categories` — категория.
-3. `POST /api/listings?ownerId=...&categoryId=...` — черновик объявления.
-4. `POST /api/listings/{id}/publish` — объявление опубликовано.
-5. `POST /api/messages?senderId=...&receiverId=...&listingId=...` — сообщение по объявлению.
-6. `GET /api/messages/listing/{listingId}` — видна переписка.
-7. `POST /api/reports?authorId=...&listingId=...` — жалоба.
-8. `POST /api/reports/{id}/in-review` — жалоба в работе.
-9. `POST /api/reports/{id}/resolve-and-close-listing` — жалоба решена, объявление закрыто; проверка: `GET /api/listings/{id}` и `GET /api/reports/{id}`.
+На Linux/macOS: `./mvnw spring-boot:run`. Порт по умолчанию: **8081** (`application.properties`).
 
 ---
 
-*Кратко: сервис умеет полный CRUD по пяти сущностям, шесть бизнес-операций для жизненного цикла объявления, переписки и модерации жалоб, с транзакцией при совместном обновлении жалобы и объявления.*
+## Задание 2. Работа с REST
+
+### Тема
+
+**Онлайн-доска объявлений (adboard):** пользователи, категории, объявления, переписка по объявлению, жалобы на объявления.
+
+### Сущности и CRUD
+
+Для **каждой** сущности реализованы методы контроллера: **создание**, **получение** (список и по id), **изменение**, **удаление**.
+
+| Сущность | Базовый путь API |
+|----------|------------------|
+| Пользователь | `/api/users` |
+| Категория | `/api/categories` |
+| Объявление | `/api/listings` |
+| Сообщение | `/api/messages` |
+| Жалоба | `/api/reports` |
+
+Дополнительно к заданию 1: эндпоинты `GET /hello`, `GET /info`.
+
+### Что сервис может развивать дальше (идеи)
+
+- Аутентификация и роли (владелец объявления / модератор).
+- Поиск и фильтры объявлений (категория, цена, текст).
+- Загрузка изображений к объявлениям.
+- Уведомления о новых сообщениях.
+- Очередь жалоб для модерации и аналитика.
+
+### Postman
+
+Коллекция с парами запросов (CRUD и сценарии): файл **`adboard/adboard-postman-collection.json`**.  
+Импорт: Postman → **Import** → выбрать JSON. Переменная **`baseUrl`**: `http://localhost:8081`; при необходимости задайте id сущностей (`userId`, `categoryId`, и т.д.).
+
+---
+
+## Задание 3. Базы данных и бизнес-операции
+
+### База данных
+
+- **Реляционная СУБД: PostgreSQL** (драйвер в `pom.xml`, настройки в `adboard/src/main/resources/application.properties`).
+- **Чувствительные данные** (пароль и при необходимости URL/логин) для продакшена задавайте через **переменные окружения**, а не храните в открытом виде в репозитории:
+  - `SPRING_DATASOURCE_URL`
+  - `SPRING_DATASOURCE_USERNAME`
+  - `SPRING_DATASOURCE_PASSWORD`
+
+### Таблицы, связи, ограничения
+
+Таблицы соответствуют JPA-сущностям в `adboard/src/main/java/ru/rkjrth/adboard/entity/`. Схема обновляется Hibernate (`spring.jpa.hibernate.ddl-auto=update`).
+
+| Сущность | Связи | Примеры ограничений |
+|----------|--------|---------------------|
+| **User** | Владелец объявлений, отправитель/получатель сообщений, автор жалоб | Уникальный **email** |
+| **Category** | Категория у многих объявлений | Уникальное **name** |
+| **Listing** | Принадлежит User и Category | FK на `owner_id`, `category_id`; статусы и даты |
+| **Message** | Отправитель, получатель (User), объявление (Listing) | FK на пользователей и объявление |
+| **Report** | Автор (User), объявление (Listing) | FK на автора и объявление |
+
+### Тестовые данные
+
+Набор тестовых записей удобно создать **через сценарий в Postman** (создать пользователей → категорию → объявление → сообщения и жалобы). При необходимости для проверки можно добавить SQL-скрипт с `INSERT` или использовать `data.sql` в профиле Spring — в репозитории основной путь проверки — API и коллекция.
+
+### CRUD и БД
+
+Контроллеры из задания 2 **читают и пишут в PostgreSQL** через сервисы и **Spring Data JPA** (репозитории в `repository/`), а не в память.
+
+### Бизнес-операции (не меньше 5)
+
+Реализованы **6** операций с предметной логикой. Операция **поиска/выборки** учитывается, если затрагивает **не менее двух сущностей** (например, сообщения по объявлению).
+
+| Операция | HTTP |
+|----------|------|
+| Публикация объявления | `POST /api/listings/{id}/publish` |
+| Закрытие объявления | `POST /api/listings/{id}/close` |
+| Сообщение по объявлению (связь пользователей и лота) | `POST /api/messages?senderId=...&receiverId=...&listingId=...` |
+| Переписка по объявлению | `GET /api/messages/listing/{listingId}` |
+| Жалоба в рассмотрение | `POST /api/reports/{id}/in-review` |
+| Решение жалобы и закрытие объявления **в одной транзакции** | `POST /api/reports/{id}/resolve-and-close-listing` |
+
+Реализация: `ListingService`, `MessageService`, `ReportService` и соответствующие контроллеры.
+
+### Postman (задание 3)
+
+В коллекции **`adboard/adboard-postman-collection.json`** есть **все** запросы: полный CRUD по каждой сущности, примеры тел **JSON**, переменные (`baseUrl`, id), а также бизнес-операции.  
+Сценарий «создать данные → выполнить операцию → увидеть результат» описан ниже.
+
+### Сценарий проверки
+
+1. Создать пользователей — `POST /api/users`  
+2. Создать категорию — `POST /api/categories`  
+3. Создать объявление — `POST /api/listings?ownerId=...&categoryId=...`  
+4. Опубликовать — `POST /api/listings/{id}/publish`  
+5. Отправить сообщение — `POST /api/messages?...`  
+6. Посмотреть переписку — `GET /api/messages/listing/{listingId}`  
+7. Подать жалобу — `POST /api/reports?...`  
+8. В рассмотрение — `POST /api/reports/{id}/in-review`  
+9. Решить жалобу и закрыть лот — `POST /api/reports/{id}/resolve-and-close-listing`, затем `GET` по объявлению и жалобе.
+
+---
+
+## Коротко: тема, сущности, возможности сервиса
+
+| | |
+|--|--|
+| **Тема** | Онлайн-доска объявлений |
+| **Сущности** | User, Category, Listing, Message, Report |
+| **Операции** | Полный REST CRUD по пяти сущностям; публикация и закрытие объявления; переписка и просмотр диалога по объявлению; модерация жалоб, в том числе атомарное закрытие жалобы и связанного объявления |
+
+---
+
+*Java 17, Spring Boot 3.5.5, порт по умолчанию 8081.*
