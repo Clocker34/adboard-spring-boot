@@ -1,11 +1,10 @@
 package ru.rkjrth.adboard.controller;
 
+import jakarta.validation.Valid;
+import ru.rkjrth.adboard.entity.Report;
+import ru.rkjrth.adboard.service.ReportService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import ru.rkjrth.adboard.entity.Report;
-import ru.rkjrth.adboard.entity.Report.Status;
-import ru.rkjrth.adboard.service.ReportService;
-import ru.rkjrth.adboard.repository.ReportRepository;
 
 import java.util.List;
 
@@ -14,77 +13,56 @@ import java.util.List;
 public class ReportController {
 
     private final ReportService reportService;
-    private final ReportRepository reportRepository;
 
-    public ReportController(ReportService reportService,
-                            ReportRepository reportRepository) {
+    public ReportController(ReportService reportService) {
         this.reportService = reportService;
-        this.reportRepository = reportRepository;
     }
-
-    // ==== НОВОЕ: получить все жалобы ====
 
     @GetMapping
     public List<Report> getAll() {
-        return reportRepository.findAll();
+        return reportService.getAll();
     }
-
-    // ==== НОВОЕ: получить одну жалобу по id ====
 
     @GetMapping("/{id}")
     public ResponseEntity<Report> getById(@PathVariable Long id) {
-        return reportRepository.findById(id)
+        return reportService.getById(id)
                 .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    // ====== DTO для запросов ======
-
-    public static class CreateReportRequest {
-        private String reason;
-
-        public String getReason() {
-            return reason;
-        }
-
-        public void setReason(String reason) {
-            this.reason = reason;
-        }
+    @PostMapping
+    public ResponseEntity<Report> create(@RequestParam Long authorId,
+                                         @RequestParam Long listingId,
+                                         @Valid @RequestBody Report report) {
+        return reportService.create(authorId, listingId, report)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.badRequest().build());
     }
 
-    public static class CompleteReviewRequest {
-        private Status status;
-
-        public Status getStatus() {
-            return status;
-        }
-
-        public void setStatus(Status status) {
-            this.status = status;
-        }
+    @PutMapping("/{id}")
+    public ResponseEntity<Report> update(@PathVariable Long id, @Valid @RequestBody Report report) {
+        return reportService.update(id, report)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    // Бизнес-операция 3: подать жалобу на объявление
-    @PostMapping("/listing/{listingId}/from/{reporterId}")
-    public ResponseEntity<Report> createReport(@PathVariable Long listingId,
-                                               @PathVariable Long reporterId,
-                                               @RequestBody CreateReportRequest body) {
-        Report report = reportService.createReport(listingId, reporterId, body.getReason());
-        return ResponseEntity.ok(report);
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        boolean deleted = reportService.delete(id);
+        return deleted ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
     }
 
-    // Бизнес-операция 4: взять жалобу в работу
-    @PostMapping("/{reportId}/start-review")
-    public ResponseEntity<Report> startReview(@PathVariable Long reportId) {
-        Report report = reportService.startReview(reportId);
-        return ResponseEntity.ok(report);
+    @PostMapping("/{id}/in-review")
+    public ResponseEntity<Report> markInReview(@PathVariable Long id) {
+        return reportService.markInReview(id)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
-    // Бизнес-операция 5: завершить рассмотрение жалобы
-    @PostMapping("/{reportId}/complete-review")
-    public ResponseEntity<Report> completeReview(@PathVariable Long reportId,
-                                                 @RequestBody CompleteReviewRequest body) {
-        Report report = reportService.completeReview(reportId, body.getStatus());
-        return ResponseEntity.ok(report);
+    @PostMapping("/{id}/resolve-and-close-listing")
+    public ResponseEntity<Report> resolveAndCloseListing(@PathVariable Long id) {
+        return reportService.resolveAndCloseListing(id)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 }

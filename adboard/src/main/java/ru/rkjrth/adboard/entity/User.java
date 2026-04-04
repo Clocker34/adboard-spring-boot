@@ -1,37 +1,42 @@
 package ru.rkjrth.adboard.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 
-import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "users")
+@Table(name = "users", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_users_email", columnNames = "email")
+})
 public class User {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
-    private String username;
+    @NotBlank
+    @Column(nullable = false)
+    private String name;
 
-    @Column(nullable = false, unique = true)
+    @Email
+    @NotBlank
+    @Column(nullable = false)
     private String email;
 
-    @Column(name = "password_hash", nullable = false)
-    private String passwordHash;
+    @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Listing> listings = new ArrayList<>();
 
-    @Column(name = "registered_at", nullable = false)
-    private LocalDateTime registeredAt;
+    @OneToMany(mappedBy = "sender")
+    private List<Message> sentMessages = new ArrayList<>();
 
-    @OneToMany(mappedBy = "owner")
-    @JsonIgnore
-    private List<Listing> listings;
+    @OneToMany(mappedBy = "receiver")
+    private List<Message> receivedMessages = new ArrayList<>();
 
-    public User() {
-    }
+    @OneToMany(mappedBy = "author")
+    private List<Report> reports = new ArrayList<>();
 
     public Long getId() {
         return id;
@@ -41,12 +46,12 @@ public class User {
         this.id = id;
     }
 
-    public String getUsername() {
-        return username;
+    public String getName() {
+        return name;
     }
 
-    public void setUsername(String username) {
-        this.username = username;
+    public void setName(String name) {
+        this.name = name;
     }
 
     public String getEmail() {
@@ -56,28 +61,5 @@ public class User {
     public void setEmail(String email) {
         this.email = email;
     }
-
-    public String getPasswordHash() {
-        return passwordHash;
-    }
-
-    public void setPasswordHash(String passwordHash) {
-        this.passwordHash = passwordHash;
-    }
-
-    public LocalDateTime getRegisteredAt() {
-        return registeredAt;
-    }
-
-    public void setRegisteredAt(LocalDateTime registeredAt) {
-        this.registeredAt = registeredAt;
-    }
-
-    public List<Listing> getListings() {
-        return listings;
-    }
-
-    public void setListings(List<Listing> listings) {
-        this.listings = listings;
-    }
 }
+

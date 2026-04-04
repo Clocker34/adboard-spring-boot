@@ -1,7 +1,10 @@
 package ru.rkjrth.adboard.entity;
 
 import jakarta.persistence.*;
-import java.time.LocalDateTime;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
+import java.time.OffsetDateTime;
 
 @Entity
 @Table(name = "messages")
@@ -11,58 +14,40 @@ public class Message {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // Текст сообщения
-    @Column(nullable = false, length = 2000)
-    private String content;
-
-    // Время отправки
+    @NotBlank
     @Column(nullable = false)
-    private LocalDateTime sentAt;
+    private String text;
 
-    // Кто отправил
     @ManyToOne(optional = false)
-    @JoinColumn(name = "sender_id", nullable = false)
+    @JoinColumn(name = "sender_id", nullable = false, foreignKey = @ForeignKey(name = "fk_message_sender"))
     private User sender;
 
-    // Кому отправил
     @ManyToOne(optional = false)
-    @JoinColumn(name = "recipient_id", nullable = false)
-    private User recipient;
+    @JoinColumn(name = "receiver_id", nullable = false, foreignKey = @ForeignKey(name = "fk_message_receiver"))
+    private User receiver;
 
-    // К какому объявлению относится
     @ManyToOne(optional = false)
-    @JoinColumn(name = "listing_id", nullable = false)
+    @JoinColumn(name = "listing_id", nullable = false, foreignKey = @ForeignKey(name = "fk_message_listing"))
     private Listing listing;
 
-    public Message() {
-    }
-
-    public Message(String content, User sender, User recipient, Listing listing) {
-        this.content = content;
-        this.sender = sender;
-        this.recipient = recipient;
-        this.listing = listing;
-        this.sentAt = LocalDateTime.now();
-    }
+    @NotNull
+    @Column(nullable = false, updatable = false)
+    private OffsetDateTime createdAt = OffsetDateTime.now();
 
     public Long getId() {
         return id;
     }
 
-    public String getContent() {
-        return content;
+    public void setId(Long id) {
+        this.id = id;
     }
 
-    public void setContent(String content) {
-        this.content = content;
+    public String getText() {
+        return text;
     }
 
-    public LocalDateTime getSentAt() {
-        return sentAt;
-    }
-
-    public void setSentAt(LocalDateTime sentAt) {
-        this.sentAt = sentAt;
+    public void setText(String text) {
+        this.text = text;
     }
 
     public User getSender() {
@@ -73,12 +58,12 @@ public class Message {
         this.sender = sender;
     }
 
-    public User getRecipient() {
-        return recipient;
+    public User getReceiver() {
+        return receiver;
     }
 
-    public void setRecipient(User recipient) {
-        this.recipient = recipient;
+    public void setReceiver(User receiver) {
+        this.receiver = receiver;
     }
 
     public Listing getListing() {
@@ -88,4 +73,13 @@ public class Message {
     public void setListing(Listing listing) {
         this.listing = listing;
     }
+
+    public OffsetDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(OffsetDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
 }
+

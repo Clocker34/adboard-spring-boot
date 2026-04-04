@@ -9,9 +9,11 @@ import ru.rkjrth.adboard.repository.CategoryRepository;
 import ru.rkjrth.adboard.repository.ListingRepository;
 import ru.rkjrth.adboard.repository.UserRepository;
 
-import java.math.BigDecimal;
+import java.util.List;
+import java.util.Optional;
 
 @Service
+@Transactional(readOnly = true)
 public class ListingService {
 
     private final ListingRepository listingRepository;
@@ -26,22 +28,62 @@ public class ListingService {
         this.categoryRepository = categoryRepository;
     }
 
-    /**
-     * Бизнес-операция 1:
-     * Создать объявление для пользователя в заданной категории.
-     */
-    @Transactional
-    public Listing createListingForUserInCategory(Long userId,
-                                                  Long categoryId,
-                                                  String title,
-                                                  String description,
-                                                  BigDecimal price) {
-        User owner = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
-        Category category = categoryRepository.findById(categoryId)
-                .orElseThrow(() -> new IllegalArgumentException("Category not found: " + categoryId));
+    public List<Listing> getAll() {
+        return listingRepository.findAll();
+    }
 
-        Listing listing = new Listing(title, description, price, owner, category);
-        return listingRepository.save(listing);
+    public Optional<Listing> getById(Long id) {
+        return listingRepository.findById(id);
+    }
+
+    @Transactional
+    public Optional<Listing> create(Long ownerId, Long categoryId, Listing listing) {
+        Optional<User> ownerOpt = userRepository.findById(ownerId);
+        Optional<Category> categoryOpt = categoryRepository.findById(categoryId);
+        if (ownerOpt.isEmpty() || categoryOpt.isEmpty()) {
+            return Optional.empty();
+        }
+        listing.setId(null);
+        listing.setOwner(ownerOpt.get());
+        listing.setCategory(categoryOpt.get());
+        return Optional.of(listingRepository.save(listing));
+    }
+
+    @Transactional
+    public Optional<Listing> update(Long id, Listing updatedData) {
+        return listingRepository.findById(id).map(existing -> {
+            existing.setTitle(updatedData.getTitle());
+            existing.setDescription(updatedData.getDescription());
+            existing.setPrice(updatedData.getPrice());
+            existing.setStatus(updatedData.getStatus());
+            return existing;
+        });
+    }
+
+    @Transactional
+    public Optional<Listing> publish(Long id) {
+        return listingRepository.findById(id).map(listing -> {
+            listing.setStatus(Listing.Status.PUBLISHED);
+            return listing;
+        });
+    }
+
+    @Transactional
+    public Optional<Listing> close(Long id) {
+        return listingRepository.findById(id).map(listing -> {
+            listing.setStatus(Listing.Status.CLOSED);
+            listing.setClosedAt(java.time.OffsetDateTime.now());
+            return listing;
+        });
+    }
+
+    @Transactional
+    public boolean delete(Long id) {
+        if (!listingRepository.existsById(id)) {
+            return false;
+        }
+        listingRepository.deleteById(id);
+        return true;
     }
 }
+

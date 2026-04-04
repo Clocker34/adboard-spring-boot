@@ -1,36 +1,53 @@
 package ru.rkjrth.adboard.service;
 
-import ru.rkjrth.adboard.dto.UserDto;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import ru.rkjrth.adboard.entity.User;
+import ru.rkjrth.adboard.repository.UserRepository;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.Optional;
 
 @Service
+@Transactional(readOnly = true)
 public class UserService {
-    private final Map<Long, UserDto> users = new ConcurrentHashMap<>();
-    private final AtomicLong idGenerator = new AtomicLong(1);
 
-    public List<UserDto> getAll() { return new ArrayList<>(users.values()); }
+    private final UserRepository userRepository;
 
-    public UserDto getById(Long id) { return users.get(id); }
-
-    public UserDto create(UserDto user) {
-        Long id = idGenerator.getAndIncrement();
-        UserDto newUser = new UserDto(id, user.name(), user.email());
-        users.put(id, newUser);
-        return newUser;
+    public UserService(UserRepository userRepository) {
+        this.userRepository = userRepository;
     }
 
-    public UserDto update(Long id, UserDto user) {
-        if (!users.containsKey(id)) return null;
-        UserDto updated = new UserDto(id, user.name(), user.email());
-        users.put(id, updated);
-        return updated;
+    public List<User> getAll() {
+        return userRepository.findAll();
     }
 
-    public boolean delete(Long id) { return users.remove(id) != null; }
+    public Optional<User> getById(Long id) {
+        return userRepository.findById(id);
+    }
+
+    @Transactional
+    public User create(User user) {
+        user.setId(null);
+        return userRepository.save(user);
+    }
+
+    @Transactional
+    public Optional<User> update(Long id, User updatedData) {
+        return userRepository.findById(id).map(existing -> {
+            existing.setName(updatedData.getName());
+            existing.setEmail(updatedData.getEmail());
+            return existing;
+        });
+    }
+
+    @Transactional
+    public boolean delete(Long id) {
+        if (!userRepository.existsById(id)) {
+            return false;
+        }
+        userRepository.deleteById(id);
+        return true;
+    }
 }
+

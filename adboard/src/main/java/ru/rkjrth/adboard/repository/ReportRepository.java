@@ -5,3 +5,4 @@ import ru.rkjrth.adboard.entity.Report;
 
 public interface ReportRepository extends JpaRepository<Report, Long> {
 }
+

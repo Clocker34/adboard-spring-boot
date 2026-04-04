@@ -9,7 +9,11 @@ import ru.rkjrth.adboard.repository.ListingRepository;
 import ru.rkjrth.adboard.repository.MessageRepository;
 import ru.rkjrth.adboard.repository.UserRepository;
 
+import java.util.List;
+import java.util.Optional;
+
 @Service
+@Transactional(readOnly = true)
 public class MessageService {
 
     private final MessageRepository messageRepository;
@@ -24,26 +28,50 @@ public class MessageService {
         this.listingRepository = listingRepository;
     }
 
-    /**
-     * Бизнес-операция 2:
-     * Отправить сообщение по объявлению от sender к владельцу объявления.
-     */
+    public List<Message> getAll() {
+        return messageRepository.findAll();
+    }
+
+    public Optional<Message> getById(Long id) {
+        return messageRepository.findById(id);
+    }
+
     @Transactional
-    public Message sendMessageToListingOwner(Long listingId,
-                                             Long senderId,
-                                             String content) {
-        Listing listing = listingRepository.findById(listingId)
-                .orElseThrow(() -> new IllegalArgumentException("Listing not found: " + listingId));
-
-        User sender = userRepository.findById(senderId)
-                .orElseThrow(() -> new IllegalArgumentException("Sender not found: " + senderId));
-
-        User recipient = listing.getOwner();
-        if (recipient.getId().equals(sender.getId())) {
-            throw new IllegalArgumentException("Owner cannot send message to himself for this listing");
+    public Optional<Message> create(Long senderId, Long receiverId, Long listingId, Message message) {
+        Optional<User> senderOpt = userRepository.findById(senderId);
+        Optional<User> receiverOpt = userRepository.findById(receiverId);
+        Optional<Listing> listingOpt = listingRepository.findById(listingId);
+        if (senderOpt.isEmpty() || receiverOpt.isEmpty() || listingOpt.isEmpty()) {
+            return Optional.empty();
         }
+        message.setId(null);
+        message.setSender(senderOpt.get());
+        message.setReceiver(receiverOpt.get());
+        message.setListing(listingOpt.get());
+        return Optional.of(messageRepository.save(message));
+    }
 
-        Message message = new Message(content, sender, recipient, listing);
-        return messageRepository.save(message);
+    public List<Message> getConversationForListing(Long listingId) {
+        return listingRepository.findById(listingId)
+                .map(messageRepository::findByListing)
+                .orElseGet(List::of);
+    }
+
+    @Transactional
+    public Optional<Message> update(Long id, Message updatedData) {
+        return messageRepository.findById(id).map(existing -> {
+            existing.setText(updatedData.getText());
+            return existing;
+        });
+    }
+
+    @Transactional
+    public boolean delete(Long id) {
+        if (!messageRepository.existsById(id)) {
+            return false;
+        }
+        messageRepository.deleteById(id);
+        return true;
     }
 }
+

@@ -1,15 +1,17 @@
 package ru.rkjrth.adboard.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 @Entity
 @Table(name = "reports")
 public class Report {
 
     public enum Status {
-        OPEN,
+        NEW,
         IN_REVIEW,
         RESOLVED,
         REJECTED
@@ -19,34 +21,25 @@ public class Report {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, columnDefinition = "text")
+    @NotBlank
+    @Column(nullable = false)
     private String reason;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private Status status = Status.OPEN;
+    private Status status = Status.NEW;
 
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "author_id", nullable = false, foreignKey = @ForeignKey(name = "fk_report_author"))
+    private User author;
 
-    @ManyToOne
-    @JoinColumn(name = "reporter_id", nullable = false)
-    private User reporter;
-
-    @ManyToOne
-    @JoinColumn(name = "listing_id", nullable = false)
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "listing_id", nullable = false, foreignKey = @ForeignKey(name = "fk_report_listing"))
     private Listing listing;
 
-    public Report() {
-    }
-
-    public Report(String reason, User reporter, Listing listing) {
-        this.reason = reason;
-        this.reporter = reporter;
-        this.listing = listing;
-        this.status = Status.OPEN;
-        this.createdAt = LocalDateTime.now();
-    }
+    @NotNull
+    @Column(nullable = false, updatable = false)
+    private OffsetDateTime createdAt = OffsetDateTime.now();
 
     public Long getId() {
         return id;
@@ -72,20 +65,12 @@ public class Report {
         this.status = status;
     }
 
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
+    public User getAuthor() {
+        return author;
     }
 
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public User getReporter() {
-        return reporter;
-    }
-
-    public void setReporter(User reporter) {
-        this.reporter = reporter;
+    public void setAuthor(User author) {
+        this.author = author;
     }
 
     public Listing getListing() {
@@ -95,4 +80,13 @@ public class Report {
     public void setListing(Listing listing) {
         this.listing = listing;
     }
+
+    public OffsetDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(OffsetDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
 }
+

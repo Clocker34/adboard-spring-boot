@@ -1,135 +1,101 @@
-# Adboard – сервис объявлений
+# Задание 3. Adboard — база данных и бизнес-операции
 
 ## Тема проекта
 
-Онлайн-доска объявлений, где пользователи публикуют объявления в разных категориях, могут отправлять сообщения владельцам и оставлять жалобы на нарушение правил.
+**Онлайн-доска объявлений:** пользователи публикуют объявления в категориях, обмениваются сообщениями по объявлению, пользователи могут подавать жалобы на объявления. Данные хранятся в **PostgreSQL**, доступ — через **Spring Data JPA** (не в памяти).
 
 ## Основные сущности
 
-- **User** – пользователь сервиса (username, email, дата регистрации, пароль).
-- **Category** – категория объявлений (название, описание).
-- **Listing** – объявление (заголовок, описание, цена, владелец, категория, статус).
-- **Message** – сообщение, отправленное владельцу объявления.
-- **Report** – жалоба на объявление (причина, статус, автор, связанное объявление).
+| Сущность | Назначение | Связи и ограничения |
+|----------|------------|---------------------|
+| **User** | Пользователь | Уникальный **email**. One-to-many к объявлениям (владелец), сообщениям (отправитель/получатель), жалобам (автор). |
+| **Category** | Категория объявлений | Уникальное **name**. One-to-many к объявлениям. |
+| **Listing** | Объявление | Many-to-one к **User** (owner), **Category**; статусы `DRAFT` / `PUBLISHED` / `CLOSED`, даты создания/обновления/закрытия. |
+| **Message** | Сообщение в контексте объявления | Many-to-one к **User** (sender, receiver) и **Listing**. |
+| **Report** | Жалоба на объявление | Many-to-one к **User** (author) и **Listing**; статусы `NEW` / `IN_REVIEW` / `RESOLVED` / `REJECTED`. |
+
+Схема таблиц создаётся Hibernate (`spring.jpa.hibernate.ddl-auto=update`) на основе сущностей в `adboard/src/main/java/ru/rkjrth/adboard/entity/`.
+
+## База данных и конфигурация
+
+- **СУБД:** PostgreSQL.
+- Параметры подключения задаются в `adboard/src/main/resources/application.properties` (URL, пользователь, пароль).
+
+Чувствительные значения для продакшена или сдачи лучше не фиксировать в репозитории: переопределите через **переменные окружения** (Spring Boot подхватывает их автоматически):
+
+- `SPRING_DATASOURCE_URL` — например `jdbc:postgresql://localhost:5432/adboard`
+- `SPRING_DATASOURCE_USERNAME`
+- `SPRING_DATASOURCE_PASSWORD`
+
+**БД в Docker (пример):** контейнер с Postgres должен слушать тот же хост/порт, что и в JDBC URL. Просмотр таблиц:
+
+```bash
+docker exec -it <имя_контейнера> psql -U <postgres_user> -d adboard -c "\dt"
+```
+
+## CRUD по сущностям
+
+Контроллеры читают и пишут в БД через сервисы и репозитории.
+
+| Ресурс | Базовый путь | Примечание |
+|--------|--------------|------------|
+| Пользователи | `GET/POST/PUT/DELETE /api/users` | Тело: `name`, `email` |
+| Категории | `GET/POST/PUT/DELETE /api/categories` | Тело: `name`, `description` |
+| Объявления | `GET/POST/PUT/DELETE /api/listings` | Создание: query `ownerId`, `categoryId` + тело объявления |
+| Сообщения | `GET/POST/PUT/DELETE /api/messages` | Создание: query `senderId`, `receiverId`, `listingId` + тело `text` |
+| Жалобы | `GET/POST/PUT/DELETE /api/reports` | Создание: query `authorId`, `listingId` + тело причины/статуса |
+
+Служебные эндпоинты: `GET /`, `/hello`, `/info`.
+
+## Бизнес-операции (не CRUD)
+
+Реализовано **6** операций с предметной логикой (требование — не меньше 5). Места в коде: `ListingController` + `ListingService`, `MessageController` + `MessageService`, `ReportController` + `ReportService`.
+
+| # | Операция | HTTP | Кратко |
+|---|----------|------|--------|
+| 1 | Публикация объявления | `POST /api/listings/{id}/publish` | Статус объявления → `PUBLISHED`. |
+| 2 | Закрытие объявления | `POST /api/listings/{id}/close` | Статус → `CLOSED`, заполняется `closedAt`. |
+| 3 | Сообщение по объявлению | `POST /api/messages?...` | Создание сообщения с привязкой к отправителю, получателю и объявлению. |
+| 4 | Переписка по объявлению | `GET /api/messages/listing/{listingId}` | Список сообщений по данному объявлению (несколько сущностей в выборке). |
+| 5 | Жалоба в рассмотрение | `POST /api/reports/{id}/in-review` | Статус жалобы → `IN_REVIEW`. |
+| 6 | Решение жалобы и закрытие лота | `POST /api/reports/{id}/resolve-and-close-listing` | Жалоба → `RESOLVED`, связанное объявление закрывается; **одна транзакция** на две сущности. |
+
+Реализация в коде: `ListingService`, `MessageService`, `ReportService` и соответствующие REST-контроллеры в `adboard/src/main/java/ru/rkjrth/adboard/`.
+
+## Коллекция запросов (Postman)
+
+Файл: **`adboard/adboard-postman-collection.json`**
+
+- Переменная `baseUrl` (по умолчанию `http://localhost:8081`).
+- Переменные для id: `userId`, `userId2`, `categoryId`, `listingId`, `reportId`, `messageId` — заполняйте после создания сущностей.
+
+Импорт: Postman → Import → выбрать этот JSON.
+
+## Запуск приложения
+
+```text
+cd adboard
+mvnw.cmd spring-boot:run
+```
+
+(На Linux/macOS: `./mvnw spring-boot:run`.)
+
+Порт: **8081** (см. `application.properties`).
+
+Перед запуском убедитесь, что PostgreSQL доступен по URL из конфигурации и база данных создана (например, `CREATE DATABASE adboard;`).
+
+## Сценарий проверки (создать данные → операция → результат)
+
+1. `POST /api/users` — создать двух пользователей (для переписки).
+2. `POST /api/categories` — категория.
+3. `POST /api/listings?ownerId=...&categoryId=...` — черновик объявления.
+4. `POST /api/listings/{id}/publish` — объявление опубликовано.
+5. `POST /api/messages?senderId=...&receiverId=...&listingId=...` — сообщение по объявлению.
+6. `GET /api/messages/listing/{listingId}` — видна переписка.
+7. `POST /api/reports?authorId=...&listingId=...` — жалоба.
+8. `POST /api/reports/{id}/in-review` — жалоба в работе.
+9. `POST /api/reports/{id}/resolve-and-close-listing` — жалоба решена, объявление закрыто; проверка: `GET /api/listings/{id}` и `GET /api/reports/{id}`.
 
 ---
 
-## Операции сервиса
-
-### CRUD
-
-**Пользователи**
-
-- `GET /api/users`
-- `GET /api/users/{id}`
-- `POST /api/users`
-- `PUT /api/users/{id}`
-- `DELETE /api/users/{id}`
-
-**Категории**
-
-- `GET /api/categories`
-- `GET /api/categories/{id}`
-- `POST /api/categories`
-- `PUT /api/categories/{id}`
-- `DELETE /api/categories/{id}`
-
-**Объявления**
-
-- `GET /api/listings`
-- `GET /api/listings/{id}`
-- `POST /api/listings`
-- `PUT /api/listings/{id}`
-- `DELETE /api/listings/{id}`
-
----
-
-### Бизнес‑операции (задание 3)
-
-1. **Создать объявление от пользователя в категории**  
-   `POST /api/listings/user/{userId}/category/{categoryId}`
-
-2. **Отправить сообщение владельцу объявления**  
-   `POST /api/messages/listing/{listingId}/from/{senderId}`
-
-3. **Оставить жалобу на объявление**  
-   `POST /api/reports/listing/{listingId}/from/{reporterId}`
-
-4. **Взять жалобу в работу (скрыть объявление)**  
-   `POST /api/reports/{reportId}/start-review`
-
-5. **Завершить рассмотрение жалобы (подтвердить / отклонить)**  
-   `POST /api/reports/{reportId}/complete-review`
-
----
-
-### Поиск объявлений
-
-Фильтрация объявлений по категории, владельцу, статусу и диапазону цен:
-
-- `GET /api/listings/search?categoryId=&ownerId=&status=&minPrice=&maxPrice=`
-
----
-
-## Безопасность (задание 4)
-
-Сервис использует Spring Security и Basic Auth.
-
-### Аутентификация
-
-- Схема: **HTTP Basic Auth**.
-- Предопределённые пользователи (in‑memory):
-  - **ADMIN**:  
-    - логин: `admin`  
-    - пароль: `adminpass`
-  - **USER**:  
-    - логин: `student`  
-    - пароль: `password`
-
-### Авторизация и роли
-
-- Роль **ADMIN**:
-  - имеет доступ ко всем эндпоинтам сервиса;
-  - может управлять пользователями (`/api/users/**`);
-  - может работать с жалобами (`/api/reports/**`).
-
-- Роль **USER**:
-  - имеет доступ к пользовательским операциям (объявления, сообщения, поиск);
-  - не имеет доступа к административным эндпоинтам `/api/users/**` и `/api/reports/**`.
-
-Правила безопасности (упрощённо):
-
-- `POST /api/auth/register` – доступен всем (без авторизации).
-- `/api/users/**`, `/api/reports/**` – только роль ADMIN.
-- Остальные эндпоинты `/api/**` – любая аутентифицированная роль (USER или ADMIN).
-
-### Регистрация пользователя
-
-Регистрация нового пользователя доступна без авторизации.
-
-- `POST /api/auth/register`
-
-Пример тела запроса:
-
-```json
-{
-  "username": "newuser",
-  "email": "newuser@example.com",
-  "password": "Qwerty1!"
-}
-Пароль должен быть:
-
-не короче 8 символов;
-
-содержать хотя бы одну цифру;
-
-содержать хотя бы один спецсимвол из набора !@#$%^&*.
-
-Тестовые данные
-Примеры начальных данных в БД:
-
-Category id = 1: «Автомобили»
-
-User id = 1: «Иван Иванов»
-
-Listing id = 1: «Продаю Toyota Camry»
+*Кратко: сервис умеет полный CRUD по пяти сущностям, шесть бизнес-операций для жизненного цикла объявления, переписки и модерации жалоб, с транзакцией при совместном обновлении жалобы и объявления.*

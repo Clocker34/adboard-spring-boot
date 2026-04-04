@@ -5,3 +5,4 @@ import ru.rkjrth.adboard.entity.Category;
 
 public interface CategoryRepository extends JpaRepository<Category, Long> {
 }
+

@@ -1,29 +1,29 @@
 package ru.rkjrth.adboard.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "categories")
+@Table(name = "categories", uniqueConstraints = {
+        @UniqueConstraint(name = "uk_categories_name", columnNames = "name")
+})
 public class Category {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
+    @NotBlank
+    @Column(nullable = false)
     private String name;
 
     private String description;
 
     @OneToMany(mappedBy = "category")
-    @JsonIgnore
-    private List<Listing> listings;
-
-    public Category() {
-    }
+    private List<Listing> listings = new ArrayList<>();
 
     public Long getId() {
         return id;
@@ -48,12 +48,5 @@ public class Category {
     public void setDescription(String description) {
         this.description = description;
     }
-
-    public List<Listing> getListings() {
-        return listings;
-    }
-
-    public void setListings(List<Listing> listings) {
-        this.listings = listings;
-    }
 }
+

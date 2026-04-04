@@ -1,66 +1,58 @@
 package ru.rkjrth.adboard.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 
 @Entity
 @Table(name = "listings")
 public class Listing {
 
     public enum Status {
-        ACTIVE,
-        HIDDEN,
-        SOLD
+        DRAFT,
+        PUBLISHED,
+        CLOSED
     }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @NotBlank
     @Column(nullable = false)
     private String title;
 
-    @Column(columnDefinition = "text")
     private String description;
 
+    @NotNull
     @Column(nullable = false)
     private BigDecimal price;
 
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private Status status;
+    private Status status = Status.DRAFT;
 
-    @ManyToOne
-    @JoinColumn(name = "owner_id", nullable = false)
-    @JsonIgnoreProperties("listings")
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "owner_id", nullable = false, foreignKey = @ForeignKey(name = "fk_listing_owner"))
     private User owner;
 
-    @ManyToOne
-    @JoinColumn(name = "category_id", nullable = false)
-    @JsonIgnoreProperties("listings")
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "category_id", nullable = false, foreignKey = @ForeignKey(name = "fk_listing_category"))
     private Category category;
 
-    public Listing() {
-    }
+    @Column(nullable = false, updatable = false)
+    private OffsetDateTime createdAt = OffsetDateTime.now();
 
-    public Listing(String title,
-                   String description,
-                   BigDecimal price,
-                   User owner,
-                   Category category) {
-        this.title = title;
-        this.description = description;
-        this.price = price;
-        this.owner = owner;
-        this.category = category;
-        this.createdAt = LocalDateTime.now();
-        this.status = Status.ACTIVE;
+    private OffsetDateTime updatedAt;
+
+    private OffsetDateTime closedAt;
+
+    @PreUpdate
+    public void onUpdate() {
+        this.updatedAt = OffsetDateTime.now();
     }
 
     public Long getId() {
@@ -95,14 +87,6 @@ public class Listing {
         this.price = price;
     }
 
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
-
     public Status getStatus() {
         return status;
     }
@@ -126,4 +110,29 @@ public class Listing {
     public void setCategory(Category category) {
         this.category = category;
     }
+
+    public OffsetDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(OffsetDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public OffsetDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(OffsetDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
+
+    public OffsetDateTime getClosedAt() {
+        return closedAt;
+    }
+
+    public void setClosedAt(OffsetDateTime closedAt) {
+        this.closedAt = closedAt;
+    }
 }
+

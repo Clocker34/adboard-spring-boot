@@ -1,77 +1,50 @@
 package ru.rkjrth.adboard.controller;
 
+import jakarta.validation.Valid;
+import ru.rkjrth.adboard.entity.User;
+import ru.rkjrth.adboard.service.UserService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import ru.rkjrth.adboard.entity.User;
-import ru.rkjrth.adboard.repository.UserRepository;
 
-import java.net.URI;
-import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/users")
 public class UserController {
 
-    private final UserRepository userRepository;
+    private final UserService userService;
 
-    public UserController(UserRepository userRepository) {
-        this.userRepository = userRepository;
+    public UserController(UserService userService) {
+        this.userService = userService;
     }
 
     @GetMapping
     public List<User> getAll() {
-        return userRepository.findAll();
+        return userService.getAll();
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<User> getById(@PathVariable Long id) {
-        return userRepository.findById(id)
+        return userService.getById(id)
                 .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @PostMapping
-    public ResponseEntity<User> create(@RequestBody User user) {
-        if (user.getRegisteredAt() == null) {
-            user.setRegisteredAt(LocalDateTime.now());
-        }
-        // временно для задания 3: чтобы не падать на not null password_hash
-        if (user.getPasswordHash() == null || user.getPasswordHash().isBlank()) {
-            user.setPasswordHash("TEMP_" + user.getEmail());
-        }
-
-        User saved = userRepository.save(user);
-        return ResponseEntity
-                .created(URI.create("/api/users/" + saved.getId()))
-                .body(saved);
+    public ResponseEntity<User> create(@Valid @RequestBody User user) {
+        return ResponseEntity.ok(userService.create(user));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<User> update(@PathVariable Long id,
-                                       @RequestBody User updated) {
-        return userRepository.findById(id)
-                .map(existing -> {
-                    existing.setUsername(updated.getUsername());
-                    existing.setEmail(updated.getEmail());
-
-                    // если в body пришёл новый hash — обновляем, иначе оставляем старый
-                    if (updated.getPasswordHash() != null && !updated.getPasswordHash().isBlank()) {
-                        existing.setPasswordHash(updated.getPasswordHash());
-                    }
-
-                    User saved = userRepository.save(existing);
-                    return ResponseEntity.ok(saved);
-                })
-                .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<User> update(@PathVariable Long id, @Valid @RequestBody User user) {
+        return userService.update(id, user)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
-        if (!userRepository.existsById(id)) {
-            return ResponseEntity.notFound().build();
-        }
-        userRepository.deleteById(id);
-        return ResponseEntity.noContent().build();
+        boolean deleted = userService.delete(id);
+        return deleted ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
     }
 }
