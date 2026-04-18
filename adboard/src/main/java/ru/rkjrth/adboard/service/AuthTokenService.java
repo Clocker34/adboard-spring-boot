@@ -50,7 +50,7 @@ public class AuthTokenService {
         if (user.getPasswordHash() == null || !passwordEncoder.matches(password, user.getPasswordHash())) {
             throw new BadCredentialsException("Bad credentials");
         }
-        String jti = UUID.randomUUID().toString();
+        String jti = UUID.randomUUID().toString(); //после проверки пароля в БД
         Instant expiresAt = Instant.now().plusMillis(refreshExpirationMs);
         UserSession session = new UserSession();
         session.setUser(user);
