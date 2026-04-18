@@ -1,6 +1,6 @@
 # Adboard — учебный проект (Spring Boot)
 
-Кратко о репозитории по этапам **заданий 1–5**: подготовка проекта, REST API, база данных, базовая безопасность, **JWT (access/refresh) и сессии в БД**.
+Кратко о репозитории по этапам **заданий 1–5**: подготовка проекта, REST API, база данных, базовая безопасность, **JWT (access/refresh) и сессии в БД**. Дополнительно: **лицензирование ПО** по ER (таблицы в PostgreSQL, операции создание/активация/проверка/продление, **Ticket** и **ЭЦП**): см. [раздел ниже](#licensing) и файл **`docs/Лицензирование-API-и-БД.md`**.
 
 ---
 
@@ -146,7 +146,7 @@ cd adboard
 
 - Подключён **`spring-boot-starter-security`**: **сессии stateless**, **CSRF отключён** (типично для JWT API).
 - Аутентификация по **заголовку** `Authorization: Bearer <access JWT>` (фильтр `JwtAuthenticationFilter`).
-- Публично без токена: `GET /`, `/hello`, `/info`, **`GET /api/csrf`**, **`POST /api/auth/register`**, **`POST /auth/login`**, **`POST /auth/refresh`**.
+- Публично без токена: `GET /`, `/hello`, `/info`, **`GET /api/csrf`**, **`POST /api/auth/register`**, **`POST /auth/login`**, **`POST /auth/refresh`**, а также **`POST /api/licenses/activate`**, **`POST /api/licenses/check`**, **`GET /api/licenses/signing-public-key`** (лицензирование).
 - Остальные **`/api/**`** (кроме перечисленного) — с валидным **access**-токеном.
 - **`/api/users/**`** и **`/api/reports/**`** — роль **ADMIN**.
 
@@ -216,6 +216,24 @@ cd adboard
 
 - `JwtTokenProviderTest` — корректность claims refresh-токена (`jti`).
 - `AuthTokenIntegrationTest` — полный сценарий login → доступ по access → refresh → отказ при reuse старого refresh → проверка статусов в БД.
+
+---
+
+<a id="licensing"></a>
+
+## Лицензирование (ER, операции, Ticket и ЭЦП)
+
+Реализованы таблицы **`license_products`**, **`license_types`**, **`license_devices`**, **`licenses`**, **`device_license`**, **`license_history`** и связи с **`users`**. Операции: **создание** и **продление** лицензии (админ, JWT), **активация** на устройстве и **проверка** с выдачей подписанного тикета (публичные эндпоинты без JWT).
+
+| Действие | API |
+|----------|-----|
+| Создать лицензию | `POST /api/licenses/admin/create` |
+| Продлить | `POST /api/licenses/admin/renew` |
+| Активировать | `POST /api/licenses/activate` |
+| Проверить (ответ: `Ticket` + `signatureBase64`) | `POST /api/licenses/check` |
+| Ключ проверки ЭЦП | `GET /api/licenses/signing-public-key` |
+
+Подробности по полям **`Ticket`** / **`TicketResponse`**, подписи RSA и конфигурации — в **`docs/Лицензирование-API-и-БД.md`**. Автотест сценария: **`LicenseFlowIntegrationTest`**.
 
 ---
 
